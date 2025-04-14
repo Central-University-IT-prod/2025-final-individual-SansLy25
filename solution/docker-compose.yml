@@ -1,0 +1,58 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:13
+    environment:
+      POSTGRES_DB: api_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    command: postgres -c listen_addresses='REDACTED'
+    networks:
+      - mynetwork
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres -d api_db" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  api:
+    build: ./api
+    environment:
+      POSTGRES_DB: api_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_HOST: "db"
+      GIGACHAT_TOKEN: ${GIGACHAT_TOKEN}
+      GIGACHAT_SCOPE: ${GIGACHAT_SCOPE}
+      MODERATE_AD_TEXT: ${MODERATE_AD_TEXT}
+      DJANGO_DEBUG: ${DJANGO_DEBUG}
+      MULTI_PART_DATA_CAMPAIGN: ${MULTI_PART_DATA_CAMPAIGN}
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./api/src/media:/app/src/media
+    networks:
+      - mynetwork
+
+  nginx:
+    build: ./nginx
+    ports:
+      - "8080:8080"
+    depends_on:
+      - api
+    networks:
+      - mynetwork
+    volumes:
+      - ./api/src/media:/app/src/media
+
+volumes:
+  postgres_data:
+
+networks:
+  mynetwork:
+    driver: bridge
